@@ -3,7 +3,6 @@ import config from '../config/index.js';
 import fs from 'fs';
 
 
-
 cloudinary.config({ 
     cloud_name: config.CLOUDINARY_CLOUD_NAME, 
     api_key: config.CLOUDINARY_API_KEY, 
@@ -27,7 +26,6 @@ export const extractFilePath = (url) => {
 
 
 
-
 export const uploadOnCloudinary = async (localFilePath, folderPath="videohub") => {
     try {
         if (!localFilePath) return null
@@ -48,6 +46,7 @@ export const uploadOnCloudinary = async (localFilePath, folderPath="videohub") =
 }
 
 
+
 export const deletePhotoOnCloudinary = async (cloudinaryPhotoPathUrl) => {
     try {
  
@@ -63,6 +62,7 @@ export const deletePhotoOnCloudinary = async (cloudinaryPhotoPathUrl) => {
         return null
     }
 };
+
 
 
 export const deleteVideoOnCloudinary = async (cloudinaryVideoPathUrl) => {
