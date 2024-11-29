@@ -6,13 +6,13 @@ import {
     loginUser,
     logoutUser,
     refreshAccessToken,
-    changeCurrentPassword,
     getCurrentUserProfile,
-    updateUserAccountDetails,
+    updateCurrentUserPassword,
+    updateCurrentUserAccountDetails,
     updateUserAvatar,
     updateUserCoverImage,
-    getUserChannelProfile,
-    getUserWatchHistory,
+    getChannelProfile,
+    getWatchHistory,
 } from "../controllers/user.controller.js"
 
 
@@ -41,23 +41,19 @@ router.route("/logout").post(verifyJWT, logoutUser)
 
 router.route("/refresh-token").post(refreshAccessToken)
 
-router.route("/change-password").post(verifyJWT, changeCurrentPassword)
+router.route("/profile").get(verifyJWT, getCurrentUserProfile)
 
-router.route("/current").get(verifyJWT, getCurrentUserProfile)
+router.route("/change-password").post(verifyJWT, updateCurrentUserPassword)
 
-router.route("/update/account-details").patch(verifyJWT, updateUserAccountDetails)
+router.route("/update/account-details").patch(verifyJWT, updateCurrentUserAccountDetails)
 
 router.route("/update/avatar").patch(verifyJWT, upload.single("avatar"), updateUserAvatar)
 
 router.route("/update/cover-image").patch(verifyJWT, upload.single("coverImage"), updateUserCoverImage)
 
-router.route("/channel/:username").get(verifyJWT, getUserChannelProfile)
+router.route("/channel/:username").get(verifyJWT, getChannelProfile)
 
-router.route("/watch-history").get(verifyJWT, getUserWatchHistory)
-
-
-
-
+router.route("/watch-history").get(verifyJWT, getWatchHistory)
 
 
 
