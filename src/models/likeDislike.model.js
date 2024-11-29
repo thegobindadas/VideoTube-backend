@@ -26,4 +26,5 @@ const likeDislikeSchema = new Schema({
 }, { timestamps: true });
 
 
+
 export const LikeDislike = mongoose.model("LikeDislike", likeDislikeSchema)
