@@ -32,7 +32,7 @@ export const registerUser = asyncHandler(async (req, res) => {
     const { username, email, fullName, password } = req.body
     
     if ([username, email, fullName, password].some(field => field?.trim() === "" || field?.trim() === undefined)) {
-        throw new ApiError(422, "All fields are required.")
+        throw new ApiError(400, "All fields are required.")
     }
 
 
@@ -49,11 +49,11 @@ export const registerUser = asyncHandler(async (req, res) => {
     if (req.files && Array.isArray(req.files.avatar) && req.files.avatar.length > 0) {
         avatarLocalPath = req.files?.avatar[0]?.path;
     }else {
-        throw new ApiError(422, "Avatar file is required.")
+        throw new ApiError(400, "Avatar file is required.")
     }
 
     if (!avatarLocalPath) {
-        throw new ApiError(422, "Avatar file is required.")
+        throw new ApiError(400, "Avatar file is required.")
     }
 
     
@@ -105,7 +105,7 @@ export const loginUser = asyncHandler(async (req, res) => {
     const { username, email, password } = req.body
 
     if (!username && !email) {
-        throw new ApiError(422, "Username or email is required.")
+        throw new ApiError(400, "Username or email is required.")
     }
 
     // if (!(username || email)) {
@@ -123,7 +123,7 @@ export const loginUser = asyncHandler(async (req, res) => {
 
 
     if (!password) {
-        throw new ApiError(422, "Password is required.")
+        throw new ApiError(400, "Password is required.")
     }
 
     const isPasswordValid = await user.isPasswordCorrect(password)
@@ -286,7 +286,7 @@ export const updateCurrentUserPassword = asyncHandler(async (req, res) => {
     const { currentPassword, newPassword, confirmNewPassword } = req.body
 
     if (!currentPassword || !newPassword || !confirmNewPassword) {
-        throw new ApiError(422, "All fields are required.")
+        throw new ApiError(400, "All fields are required.")
     }
 
     if (newPassword !== confirmNewPassword) {
@@ -330,7 +330,7 @@ export const updateCurrentUserAccountDetails = asyncHandler(async (req, res) => 
     const { fullName, email } = req.body
 
     if (!fullName || !email) {
-        throw new ApiError(422, "All fields are required.")
+        throw new ApiError(400, "Email and full name are required.")
     }
 
 
@@ -370,7 +370,7 @@ export const updateUserAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path
 
     if (!avatarLocalPath) {
-        throw new ApiError(422, "Avatar file is required.")
+        throw new ApiError(400, "Avatar file is required.")
     }
 
     
@@ -423,7 +423,7 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalPath = req.file?.path
 
     if (!coverImageLocalPath) {
-        throw new ApiError(422, "Cover image file is required.")
+        throw new ApiError(400, "Cover image file is required.")
     }
 
     
@@ -472,86 +472,83 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
 
 
 export const getChannelProfile = asyncHandler(async (req, res) => {
-    try {
 
-        const { username } = req.params
+    const { username } = req.params
+
+    if (!username?.trim()) {
+        throw new ApiError(400, "Username is required.")
+    } 
     
-        if (!username?.trim()) {
-            throw new ApiError(422, "Username is required.")
-        } 
-        
-    
-        const channel = await User.aggregate([
-            {
-                $match: {
-                    username: username?.trim().toLowerCase()
-                }
-            },
-            {
-                $lookup: {
-                    from: "subscriptions",
-                    localField: "_id",
-                    foreignField: "channel",
-                    as: "subscribers"
-                }
-            },
-            {
-                $lookup: {
-                    from: "subscriptions",
-                    localField: "_id",
-                    foreignField: "subscriber",
-                    as: "subscribedTo"
-                }
-            },
-            {
-                $addFields: {
-                    subscribersCount: {
-                        $size: "$subscribers"
-                    },
-                    subscribedToCount: {
-                        $size: "$subscribedTo"
-                    },
-                    isSubscribed: {
-                        $cond: {
-                            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
-                            then: true,
-                            else: false
-                        }
+
+    const channel = await User.aggregate([
+        {
+            $match: {
+                username: username?.trim().toLowerCase()
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo"
+            }
+        },
+        {
+            $addFields: {
+                subscribersCount: {
+                    $size: "$subscribers"
+                },
+                subscribedToCount: {
+                    $size: "$subscribedTo"
+                },
+                isSubscribed: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                        then: true,
+                        else: false
                     }
                 }
-            },
-            {
-                $project: {
-                    username: 1,
-                    fullName: 1,
-                    email: 1,
-                    avatar: 1,
-                    coverImage: 1,
-                    subscribersCount: 1,
-                    subscribedToCount: 1,
-                    isSubscribed: 1
-                }
             }
-        ])
-    
-        if (!channel?.length) {
-            throw new ApiError(404, "Channel does not exists.")
+        },
+        {
+            $project: {
+                username: 1,
+                fullName: 1,
+                email: 1,
+                avatar: 1,
+                coverImage: 1,
+                subscribersCount: 1,
+                subscribedToCount: 1,
+                isSubscribed: 1
+            }
         }
-    
-    
-    
-        return res
-            .status(200)
-            .json(
-                new ApiResponse(
-                    200,
-                    channel[0], 
-                    "Channel profile fetched successfully."
-                )
-            )
-    } catch (error) {
-        throw new ApiError(500, "Something went wrong while fetching channel profile.")
+    ])
+
+    if (!channel?.length) {
+        throw new ApiError(404, "Channel does not exists.")
     }
+
+
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                channel[0], 
+                "Channel profile fetched successfully."
+            )
+        )
+    
 })
 
 
