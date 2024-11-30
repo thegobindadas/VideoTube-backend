@@ -1,12 +1,12 @@
-import { Router } from "express"
-import { verifyJWT } from "../middlewares/auth.middleware.js"
+import { Router } from "express";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 import {
-    isSubscribed,
-    toggleSubscription,
-    getChannelSubscribers,
-    getSubscribedChannels,
+    checkSubscriptionStatus,
+    toggleSubscriptionStatus,
+    getChannelSubscribersList,
+    getUserSubscribedChannels,
     searchSubscribedChannels,
-} from "../controllers/subscription.controller.js"
+} from "../controllers/subscription.controller.js";
 
 
 
@@ -16,15 +16,17 @@ router.use(verifyJWT);
 
 
 
-router.get("/c/subscription-status/:channelId", isSubscribed);
+router.get("/channel/:channelId/subscription-status", checkSubscriptionStatus);
 
-router.route("/c/:channelId").post(toggleSubscription);
+router.route("/channel/:channelId/subscribe").post(toggleSubscriptionStatus);
 
-router.route("/c/:channelId/subscribers").get(getChannelSubscribers);
+router.route("/channel/subscribers").get(getChannelSubscribersList);
 
-router.route("/subscribed-channels").get(getSubscribedChannels)
+router.route("/subscribed-channels").get(getUserSubscribedChannels);
 
-router.route("/search/subscribed-channels").get(searchSubscribedChannels)
+router.route("/search/subscribed-channels").get(searchSubscribedChannels);
+
+
 
 
 
