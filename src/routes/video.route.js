@@ -3,16 +3,14 @@ import { upload } from "../middlewares/multer.middleware.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js"
 import { 
     publishAVideo,
-    fetchVideoById,
-    getVideoLikeDislikeCounts,
-    getVideoOwnerDetails,
+    getVideoById,
     updateVideoInfo,
-    removeVideo,
+    deleteVideo,
     toggleVideoPublishStatus,
     getAllVideos,
     handelVideoView,
     fetchRecommendedVideos,
-    getChannelVideos,
+    getVideosByChannel,
 } from "../controllers/video.controller.js"
 
 
@@ -37,25 +35,24 @@ router.route("/").post(
     publishAVideo
 );
 
-router.route("/:videoId").get(fetchVideoById)
+router.route("/:videoId").get(getVideoById);
 
-router.route("/:videoId/like-dislike-counts").get(getVideoLikeDislikeCounts)
+router.route("/:videoId").patch(upload.single("thumbnail"), updateVideoInfo);
 
-router.route("/owner/:ownerId").get(getVideoOwnerDetails)
-
-router.route("/:videoId/update").patch(upload.single("thumbnail"), updateVideoInfo);
-
-router.route("/:videoId/delete").delete(removeVideo)
+router.route("/:videoId").delete(deleteVideo);
 
 router.route("/:videoId/toggle-publish").patch(toggleVideoPublishStatus);
 
-router.route("/").get(getAllVideos)
+router.route("/").get(getAllVideos);
 
-router.route("/:videoId/view").post(handelVideoView)
+router.route("/:videoId/view").post(handelVideoView);
 
-router.route("/:videoId/recommendations").get(fetchRecommendedVideos)
+router.route("/:videoId/recommendations").get(fetchRecommendedVideos);
 
-router.get("/channel/:channelId/videos", getChannelVideos);
+router.get("/channel/:channelId/videos", getVideosByChannel);
+
+
+
 
 
 

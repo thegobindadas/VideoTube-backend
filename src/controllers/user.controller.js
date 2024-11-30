@@ -1,11 +1,11 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import config from "../config/index.js";
 import jwt from "jsonwebtoken";
-import { User } from "../models/user.model.js"
+import { User } from "../models/user.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiError.js"
-import { ApiResponse } from "../utils/ApiResponse.js"
-import { uploadOnCloudinary, deletePhotoOnCloudinary } from "../utils/cloudinary.js"
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { uploadOnCloudinary, deletePhotoOnCloudinary } from "../utils/cloudinary.js";
 
 
 
@@ -23,7 +23,7 @@ const generateAccessAndRefreshToken = async (userId) => {
     } catch (error) {
         throw new ApiError(500, "Something went wrong while generating access and refresh token") 
     }
-}
+};
 
 
 
@@ -97,7 +97,7 @@ export const registerUser = asyncHandler(async (req, res) => {
                 "User registered successfully."
             )
         )
-})
+});
 
 
 export const loginUser = asyncHandler(async (req, res) => {
@@ -165,7 +165,7 @@ export const loginUser = asyncHandler(async (req, res) => {
                 "User logged in successfully."
             )
         )
-})
+});
 
 
 export const logoutUser = asyncHandler(async (req, res) => {   
@@ -205,7 +205,7 @@ export const logoutUser = asyncHandler(async (req, res) => {
                 "User logged out successfully."
             )
         )
-})
+});
 
 
 export const refreshAccessToken = asyncHandler(async (req, res) => {
@@ -264,7 +264,7 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
     } catch (error) {
         throw new ApiError(500, error?.message || "Something went wrong while refreshing access token.")
     }
-})
+});
 
 
 export const getCurrentUserProfile = asyncHandler(async (req, res) => {
@@ -278,7 +278,7 @@ export const getCurrentUserProfile = asyncHandler(async (req, res) => {
                 "User fetched successfully."
             )
         )
-})
+});
 
 
 export const updateCurrentUserPassword = asyncHandler(async (req, res) => {
@@ -322,7 +322,7 @@ export const updateCurrentUserPassword = asyncHandler(async (req, res) => {
                 "Password changed successfully."
             )
         )
-})
+});
 
 
 export const updateCurrentUserAccountDetails = asyncHandler(async (req, res) => {
@@ -362,7 +362,7 @@ export const updateCurrentUserAccountDetails = asyncHandler(async (req, res) => 
                 "Account details updated successfully."
             )
         )
-})
+});
 
 
 export const updateUserAvatar = asyncHandler(async (req, res) => {
@@ -415,7 +415,7 @@ export const updateUserAvatar = asyncHandler(async (req, res) => {
                 "Avatar updated successfully."
             )
         )
-})
+});
 
 
 export const updateUserCoverImage = asyncHandler(async (req, res) => {
@@ -468,7 +468,7 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
                 "Cover image updated successfully."
             )
     )
-})
+});
 
 
 export const getChannelProfile = asyncHandler(async (req, res) => {
@@ -549,7 +549,7 @@ export const getChannelProfile = asyncHandler(async (req, res) => {
             )
         )
     
-})
+});
 
 
 export const getWatchHistory = asyncHandler(async (req, res) => {
