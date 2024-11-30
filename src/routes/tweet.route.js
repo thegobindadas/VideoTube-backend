@@ -1,11 +1,11 @@
-import { Router } from "express"
-import { verifyJWT } from "../middlewares/auth.middleware.js"
+import { Router } from "express";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 import {
-    createTweet,
-    getUserTweets,
-    updateTweet,
-    deleteTweet
-} from "../controllers/tweet.controller.js"
+    createNewTweet,
+    getTweetsByUser,
+    updateExistingTweet,
+    deleteTweetById,
+} from "../controllers/tweet.controller.js";
 
 
 
@@ -15,13 +15,17 @@ router.use(verifyJWT); // Apply verifyJWT middleware to all routes in this file
 
 
 
-router.route("/").post(createTweet);
+router.route("/").post(createNewTweet);
 
-router.route("/user/:userId").get(getUserTweets);
+router.route("/user/:userId").get(getTweetsByUser);
 
-router.route("/:tweetId").patch(updateTweet)
+router.route("/:tweetId").patch(updateExistingTweet);
 
-router.route("/:tweetId").delete(deleteTweet);
+router.route("/:tweetId").delete(deleteTweetById);
+
+
+
+
 
 
 

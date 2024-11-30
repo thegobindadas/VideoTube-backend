@@ -1,6 +1,6 @@
-import { Router } from "express"
-import { upload } from "../middlewares/multer.middleware.js"
-import { verifyJWT } from "../middlewares/auth.middleware.js"
+import { Router } from "express";
+import { upload } from "../middlewares/multer.middleware.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { 
     publishAVideo,
     getVideoById,
@@ -11,7 +11,7 @@ import {
     handelVideoView,
     fetchRecommendedVideos,
     getVideosByChannel,
-} from "../controllers/video.controller.js"
+} from "../controllers/video.controller.js";
 
 
 
