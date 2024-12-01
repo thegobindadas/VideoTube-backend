@@ -329,11 +329,8 @@ export const updateCurrentUserAccountDetails = asyncHandler(async (req, res) => 
 
     const { fullName, email } = req.body
 
-    if (!fullName || !email) {
-        throw new ApiError(400, "Email and full name are required.")
-    }
 
-
+    /*
     const user = await User.findByIdAndUpdate(
         req.user._id,
         {
@@ -346,9 +343,24 @@ export const updateCurrentUserAccountDetails = asyncHandler(async (req, res) => 
             new: true
         }
     ).select("-password -refreshToken")
+    */
+
+
+    const user = await User.findById(req.user?._id).select("-password -refreshToken")
 
     if (!user) {
         throw new ApiError(404, "User not found. Please try again.")
+    }
+
+
+    if (fullName) user.fullName = fullName
+    if (email) user.email = email
+
+    const updatedUser = await user.save({ validateBeforeSave: false })
+
+    if (!updatedUser) {
+        throw new ApiError(500, "Internal Server Error: Unable to update user details at the moment. Please try again later.")
+        
     }
 
 
@@ -368,31 +380,34 @@ export const updateCurrentUserAccountDetails = asyncHandler(async (req, res) => 
 export const updateUserAvatar = asyncHandler(async (req, res) => {
 
     const avatarLocalPath = req.file?.path
+    const avatar = req.user?.avatar
 
     if (!avatarLocalPath) {
         throw new ApiError(400, "Avatar file is required.")
     }
 
     
-    const avatar = await uploadOnCloudinary(avatarLocalPath, "videohub")
+    const UpdatedAvatar = await uploadOnCloudinary(avatarLocalPath, "videohub")
 
-    if(!avatar) {
-        throw new ApiError(500, "Avatar upload failed. Please try again later.")
+    if(!UpdatedAvatar) {
+        throw new ApiError(500, "Internal Server Error: Unable to upload the avatar at this time. Please check your connection or try again later.")
     }
 
 
-    const deleteAvatarInCloudinary = await deletePhotoOnCloudinary(req.user?.avatar)
+    if (avatar) {
+        const deleteAvatarOnCloudinary = await deletePhotoOnCloudinary(req.user?.avatar)
     
-    if (!deleteAvatarInCloudinary) {
-        throw new ApiError(500, "Failed to delete avatar. Please try again later.")
+        if (!deleteAvatarOnCloudinary) {
+            throw new ApiError(500, "Internal Server Error: Unable to delete the avatar at this time. Please check your connection or try again later.")
+        }
     }
-
+    
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                avatar: avatar.url
+                avatar: UpdatedAvatar.url
             }
         },
         {
@@ -421,31 +436,34 @@ export const updateUserAvatar = asyncHandler(async (req, res) => {
 export const updateUserCoverImage = asyncHandler(async (req, res) => {
 
     const coverImageLocalPath = req.file?.path
+    const coverImage = req.user?.coverImage
 
     if (!coverImageLocalPath) {
         throw new ApiError(400, "Cover image file is required.")
     }
 
     
-    const coverImage = await uploadOnCloudinary(coverImageLocalPath, "videohub")
+    const updatedCoverImage = await uploadOnCloudinary(coverImageLocalPath, "videohub")
 
-    if(!coverImage) {
-        throw new ApiError(500, "Cover image upload failed. Please try again later.")
+    if(!updatedCoverImage) {
+        throw new ApiError(500, "Internal Server Error: Unable to upload the cover image at this time. Please check your connection or try again later.")
     }
 
 
-    const deleteCoverImageInCloudinary = await deletePhotoOnCloudinary(req.user?.coverImage)
-    
-    if (!deleteCoverImageInCloudinary) {
-        throw new ApiError(500, "Failed to delete cover image. Please try again later.")
+    if (coverImage) {
+        const deleteCoverImageOnCloudinary = await deletePhotoOnCloudinary(coverImage)
+
+        if (!deleteCoverImageOnCloudinary) {
+            throw new ApiError(500, "Internal Server Error: Unable to delete the cover image at this time. Please try again later.")
+        }
     }
     
-
+    
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                coverImage: coverImage.url
+                coverImage: updatedCoverImage.url
             }
         },
         {
