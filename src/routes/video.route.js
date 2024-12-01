@@ -11,6 +11,7 @@ import {
     handelVideoView,
     fetchRecommendedVideos,
     getVideosByChannel,
+    getLikedVideos,
 } from "../controllers/video.controller.js";
 
 
@@ -49,7 +50,9 @@ router.route("/:videoId/view").post(handelVideoView);
 
 router.route("/:videoId/recommendations").get(fetchRecommendedVideos);
 
-router.get("/channel/:channelId/videos", getVideosByChannel);
+router.route("/channel/:channelId/videos").get(getVideosByChannel);
+
+router.route("/liked-videos").get(getLikedVideos);
 
 
 

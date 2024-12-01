@@ -641,3 +641,61 @@ export const getVideosByChannel = asyncHandler(async (req, res) => {
             )
         );
 });
+
+
+export const getLikedVideos = asyncHandler(async (req, res) => {
+        
+    const likedVideos = await LikeDislike.aggregate([
+        {
+            $match: {
+                likedBy: new mongoose.Types.ObjectId(req.user._id)
+            }
+        },
+        {
+            $lookup: {
+                from: "videos",
+                localField: "video",
+                foreignField: "_id",
+                as: "liked_videos",
+                pipeline: [
+                    {
+                        $project: {
+                            _id: 1,
+                            title: 1,
+                            thumbnail: 1,
+                            description: 1, // Include other fields if necessary
+                            views: 1,
+                            createdAt: 1 // Add timestamps if needed
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $unwind: {
+                path: "$liked_videos"
+            }
+        },
+        {
+            $replaceRoot: {
+                newRoot: "$liked_videos"
+            }
+        }
+    ]);
+
+    if (!likedVideos || likedVideos.length === 0) {
+        return res.status(404).json(new ApiResponse(404, [], "No liked videos found"));
+    }
+
+
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                likedVideos,
+                "Liked videos fetched successfully"
+            )
+        );
+});
