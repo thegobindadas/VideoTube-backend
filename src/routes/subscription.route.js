@@ -15,8 +15,7 @@ router.use(verifyJWT);
 
 
 
-
-router.get("/channel/:channelId/subscription-status", checkSubscriptionStatus);
+router.route("/channel/:channelId/subscription-status").get(checkSubscriptionStatus);
 
 router.route("/channel/:channelId/subscribe").post(toggleSubscriptionStatus);
 
