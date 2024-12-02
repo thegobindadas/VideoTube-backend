@@ -8,6 +8,8 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 
 
 
+/* The above code is a JavaScript function that checks the subscription status of a user to a specific
+channel. Here is a breakdown of what the code does: */
 export const checkSubscriptionStatus = asyncHandler(async (req, res) => {
 
     const { channelId } = req.params;
@@ -41,6 +43,8 @@ export const checkSubscriptionStatus = asyncHandler(async (req, res) => {
 });
 
 
+/* The above code is a JavaScript function that toggles the subscription status for a user to a
+specific channel. Here is a breakdown of what the code does: */
 export const toggleSubscriptionStatus = asyncHandler(async (req, res) => {
 
     const { channelId } = req.params;
@@ -109,7 +113,8 @@ export const toggleSubscriptionStatus = asyncHandler(async (req, res) => {
 });
 
 
-// controller to return subscriber list of a channel
+/* The above code is a controller function written in JavaScript that is responsible for fetching the
+subscriber list of a channel. Here is a breakdown of what the code is doing: */
 export const getChannelSubscribersList = asyncHandler(async (req, res) => {
     
     const requestingUserId = req.user._id;
@@ -118,7 +123,7 @@ export const getChannelSubscribersList = asyncHandler(async (req, res) => {
     
     
     if (!isValidObjectId(targetUserId)) {
-      throw new ApiError(400, "Invalid user ID.");
+      throw new ApiError(400, "Invalid channel ID.");
     }
   
 
@@ -132,14 +137,16 @@ export const getChannelSubscribersList = asyncHandler(async (req, res) => {
     
     const subscribers = await Subscription.aggregate([
         {
-            $match: { channel: new mongoose.Types.ObjectId(targetUserId) },
+            $match: { 
+                channel: new mongoose.Types.ObjectId(targetUserId) 
+            },
         },
         {
             $lookup: {
-            from: "users",
-            localField: "subscriber",
-            foreignField: "_id",
-            as: "subscriberDetails",
+                from: "users",
+                localField: "subscriber",
+                foreignField: "_id",
+                as: "subscriberDetails",
             },
         },
         {
@@ -147,21 +154,23 @@ export const getChannelSubscribersList = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
-            from: "subscriptions",
-            localField: "subscriber",
-            foreignField: "subscriber",
-            as: "channels",
+                from: "subscriptions",
+                localField: "subscriber",
+                foreignField: "subscriber",
+                as: "channels",
             },
         },
         {
             $project: {
-            _id: "$subscriberDetails._id",
-            username: "$subscriberDetails.username",
-            fullName: "$subscriberDetails.fullName",
-            avatar: "$subscriberDetails.avatar",
-            totalSubscriptions: { $size: "$channels" },
+                _id: "$subscriberDetails._id",
+                username: "$subscriberDetails.username",
+                fullName: "$subscriberDetails.fullName",
+                avatar: "$subscriberDetails.avatar",
+                totalSubscriptions: { $size: "$channels" },
+                subscribedAt: "$createdAt",
             },
         },
+        { $sort: { subscribedAt: -1  } },
         { $skip: skip },
         { $limit: limitNum },
     ]);
@@ -176,7 +185,6 @@ export const getChannelSubscribersList = asyncHandler(async (req, res) => {
   
     const subscribedByMeSet = new Set(subscriptionsByMe.map((sub) => sub.channel.toString()));
   
-    
     const result = subscribers.map((subscriber) => ({
       ...subscriber,
       isSubscribedByMe: subscribedByMeSet.has(subscriber._id.toString()),
@@ -204,7 +212,132 @@ export const getChannelSubscribersList = asyncHandler(async (req, res) => {
 })
 
 
-// controller to return subscribed channels
+/* The above code is a JavaScript function that searches for subscribers of a specific channel based on
+certain criteria. Here is a breakdown of what the code is doing: */
+export const searchChannelSubscribers = asyncHandler(async (req, res) => {
+
+    const requestingUserId = req.user._id;
+    const { userId, search = "", page = 1, limit = 10 } = req.query;
+    const targetUserId = userId || requestingUserId;
+    const skip = (page - 1) * limit;
+    
+    
+    if (!isValidObjectId(targetUserId)) {
+        throw new ApiError(400, "Invalid Channel ID.");
+    }
+
+    
+    const totalSubscribersData = await Subscription.aggregate([
+        {
+            $match: { channel: new mongoose.Types.ObjectId(targetUserId) },
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "subscriber",
+                foreignField: "_id",
+                as: "subscriberDetails",
+            },
+        },
+        { $unwind: "$subscriberDetails" },
+        {
+            $match: {
+                $or: [
+                    { "subscriberDetails.fullName": { $regex: search, $options: "i" } },
+                    { "subscriberDetails.username": { $regex: search, $options: "i" } },
+                ],
+            },
+        },
+        { $count: "count" },
+    ]);
+
+    const totalSubscribers = totalSubscribersData[0]?.count || 0;
+
+    
+    const subscriberList = await Subscription.aggregate([
+        {
+            $match: { channel: new mongoose.Types.ObjectId(targetUserId) },
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "subscriber",
+                foreignField: "_id",
+                as: "subscriberDetails",
+            },
+        },
+        { $unwind: "$subscriberDetails" },
+        {
+            $match: {
+                $or: [
+                    { "subscriberDetails.fullName": { $regex: search, $options: "i" } },
+                    { "subscriberDetails.username": { $regex: search, $options: "i" } },
+                ],
+            },
+        },
+        {
+            $sort: { createdAt: -1 }, // Sort by `createdAt` in descending order
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "subscriber",
+                foreignField: "channel",
+                as: "subscribedChannels",
+            },
+        },
+        {
+            $project: {
+                _id: "$subscriberDetails._id",
+                username: "$subscriberDetails.username",
+                fullName: "$subscriberDetails.fullName",
+                avatar: "$subscriberDetails.avatar",
+                totalSubscriptions: { $size: "$subscribedChannels" },
+            },
+        },
+        { $skip: skip },
+        { $limit: parseInt(limit) },
+    ]);
+
+    
+    const subscriberIds = subscriberList.map(subscriber => subscriber._id);
+
+    const subscriptionsByMe = await Subscription.find({
+        channel: { $in: subscriberIds },
+        subscriber: requestingUserId,
+    }).select("channel");
+
+    const subscribedByMeSet = new Set(subscriptionsByMe.map(sub => sub.channel.toString()));
+
+    const result = subscriberList.map(subscriber => ({
+        ...subscriber,
+        isSubscribedByMe: subscribedByMeSet.has(subscriber._id.toString()),
+    }));
+
+
+    const totalPages = Math.ceil(totalSubscribers / limit);
+
+    
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    subscribers: result,
+                    currentPage: parseInt(page),
+                    totalPages,
+                    totalSubscribers,
+                },
+                "Searched channel subscribers successfully."
+            )
+        );
+});
+
+
+/* The above code is a JavaScript function that retrieves the subscribed channels of a user. Here is a
+breakdown of what the code does: */
 export const getUserSubscribedChannels = asyncHandler(async (req, res) => {
 
     const requestingUserId = req.user._id;
@@ -254,8 +387,14 @@ export const getUserSubscribedChannels = asyncHandler(async (req, res) => {
                 username: "$channelDetails.username",
                 fullName: "$channelDetails.fullName",
                 avatar: "$channelDetails.avatar",
-                totalSubscribers: { $size: "$subscribers" }
+                totalSubscribers: { $size: "$subscribers" },
+                subscribedAt: "$createdAt",
             }
+        },
+        { 
+            $sort: { 
+                subscribedAt: -1 
+            } 
         },
         { 
             $skip: skip 
@@ -275,7 +414,6 @@ export const getUserSubscribedChannels = asyncHandler(async (req, res) => {
   
     const subscribedByMeSet = new Set(subscriptionsByMe.map(sub => sub.channel.toString()));
   
-      
     const result = subscribedChannels.map(channel => ({
         ...channel,
         isSubscribedByMe: subscribedByMeSet.has(channel._id.toString())
@@ -311,6 +449,11 @@ export const searchUserSubscribedChannels = asyncHandler(async (req, res) => {
         const { userId, search = "", page = 1, limit = 10 } = req.query;
         const targetUserId = userId || requestingUserId;
         const skip = (page - 1) * limit;
+
+
+        if (!isValidObjectId(targetUserId)) {
+            throw new ApiError(400, "Invalid user ID.");
+        }
 
         
         const totalSubscribedChannels = await Subscription.aggregate([
@@ -372,6 +515,9 @@ export const searchUserSubscribedChannels = asyncHandler(async (req, res) => {
                 }
             },
             {
+                $sort: { createdAt: -1 }, // Sort by `createdAt` in descending order
+            },
+            {
                 $lookup: {
                     from: "subscriptions",
                     localField: "channel",
@@ -406,6 +552,7 @@ export const searchUserSubscribedChannels = asyncHandler(async (req, res) => {
             ...channel,
             isSubscribedByMe: subscribedByMeSet.has(channel._id.toString())
         }));
+
 
         const totalPages = Math.ceil(totalCount / limit);
 

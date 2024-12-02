@@ -4,8 +4,9 @@ import {
     checkSubscriptionStatus,
     toggleSubscriptionStatus,
     getChannelSubscribersList,
+    searchChannelSubscribers,
     getUserSubscribedChannels,
-    searchSubscribedChannels,
+    searchUserSubscribedChannels,
 } from "../controllers/subscription.controller.js";
 
 
@@ -21,9 +22,11 @@ router.route("/channel/:channelId/subscribe").post(toggleSubscriptionStatus);
 
 router.route("/channel/subscribers").get(getChannelSubscribersList);
 
-router.route("/subscribed-channels").get(getUserSubscribedChannels);
+router.route("/search/channel/subscribers").get(searchChannelSubscribers);
 
-router.route("/search/subscribed-channels").get(searchSubscribedChannels);
+router.route("/channel/subscribed-channels").get(getUserSubscribedChannels);
+
+router.route("/search/channel/subscribed-channels").get(searchUserSubscribedChannels);
 
 
 
