@@ -160,7 +160,7 @@ export const getVideoById = asyncHandler(async (req, res) => {
                     ownerName: video.owner.fullName,
                     ownerAvatar: video.owner.avatar,
                     ownerUsername: video.owner.username,
-                    totalSubscribers
+                    ownerTotalSubscribers: totalSubscribers
                 },
                 "Video fetched successfully."
             )

@@ -7,6 +7,7 @@ import config from "./config/index.js"
 const app = express()
 
 
+
 app.use(cors({
     origin: config.CORS_ORIGIN,
     credentials: true
@@ -16,6 +17,7 @@ app.use(express.json({limit: "16kb"}))
 app.use(express.urlencoded({extended: true, limit: "16kb"}))
 app.use(express.static("public"))
 app.use(cookieParser())
+
 
 
 
@@ -32,15 +34,22 @@ import dashboardRouter from "./routes/dashboard.route.js"
 
 
 
+
+
 // use routes
-app.use("/api/v2/user", userRouter)
-app.use("/api/v2/video", videoRouter)
-app.use("/api/v2/like", likeRouter)
-app.use("/api/v2/comment", commentRouter)
-app.use("/api/v2/playlist", playlistRouter)
-app.use("/api/v2/tweet", tweetRouter)
-app.use("/api/v2/subscription", subscriptionRouter)
-app.use("/api/v2/dashboard", dashboardRouter)
+app.use("/api/v2/users", userRouter)
+app.use("/api/v2/videos", videoRouter)
+app.use("/api/v2/likes", likeRouter)
+app.use("/api/v2/comments", commentRouter)
+app.use("/api/v2/playlists", playlistRouter)
+app.use("/api/v2/tweets", tweetRouter)
+app.use("/api/v2/subscriptions", subscriptionRouter)
+app.use("/api/v2/dashboards", dashboardRouter)
+
+
+
+
+
 
 
 
