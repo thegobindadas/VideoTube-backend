@@ -97,9 +97,9 @@ export const toggleSubscriptionStatus = asyncHandler(async (req, res) => {
 
         return res.status(201).json(
             new ApiResponse(
-                201,
+                200,
                 {
-                    ...subscription,
+                    subscription,
                     isSubscribed: true
                 },
                 "Subscribed successfully."
@@ -115,63 +115,92 @@ export const getChannelSubscribersList = asyncHandler(async (req, res) => {
     const requestingUserId = req.user._id;
     const { userId, page = 1, limit = 10 } = req.query;
     const targetUserId = userId || requestingUserId;
-    const skip = (page - 1) * limit;
+    
+    
+    if (!isValidObjectId(targetUserId)) {
+      throw new ApiError(400, "Invalid user ID.");
+    }
+  
 
-
-    const getChannelSubscribers = await User.aggregate([
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+  
+    
+    const totalSubscribers = await Subscription.countDocuments({ channel: targetUserId });
+  
+    
+    const subscribers = await Subscription.aggregate([
         {
-            $match: {
-                _id: new mongoose.Types.ObjectId(userId)
-            }
+            $match: { channel: new mongoose.Types.ObjectId(targetUserId) },
         },
         {
             $lookup: {
-                from: "subscriptions",
-                localField: "_id",
-                foreignField: "channel",
-                as: "subscribers"
-            }
+            from: "users",
+            localField: "subscriber",
+            foreignField: "_id",
+            as: "subscriberDetails",
+            },
         },
         {
-            $unwind: "$subscribers"
+            $unwind: "$subscriberDetails",
         },
         {
             $lookup: {
-                from: "users",
-                localField: "subscribers.subscriber",
-                foreignField: "_id",
-                as: "subscriber_details"
-            }
-        },
-        {
-            $unwind: "$subscriber_details"
+            from: "subscriptions",
+            localField: "subscriber",
+            foreignField: "subscriber",
+            as: "channels",
+            },
         },
         {
             $project: {
-                _id: 0,
-                subscriber: "$subscriber_details._id",
-                username: "$subscriber_details.username",
-                fullName: "$subscriber_details.fullName",
-                avatar: "$subscriber_details.avatar"
-            }
-        }
+            _id: "$subscriberDetails._id",
+            username: "$subscriberDetails.username",
+            fullName: "$subscriberDetails.fullName",
+            avatar: "$subscriberDetails.avatar",
+            totalSubscriptions: { $size: "$channels" },
+            },
+        },
+        { $skip: skip },
+        { $limit: limitNum },
     ]);
-        
-    if (!getChannelSubscribers?.length) {
-        throw new ApiError(404, "No subscribers found for this channel.")
-    }
-
+  
+    
+    const subscriberIds = subscribers.map((subscriber) => subscriber._id);
+  
+    const subscriptionsByMe = await Subscription.find({
+      subscriber: requestingUserId,
+      channel: { $in: subscriberIds },
+    }).select("channel");
+  
+    const subscribedByMeSet = new Set(subscriptionsByMe.map((sub) => sub.channel.toString()));
+  
+    
+    const result = subscribers.map((subscriber) => ({
+      ...subscriber,
+      isSubscribedByMe: subscribedByMeSet.has(subscriber._id.toString()),
+    }));
+  
+    
+    const totalPages = Math.ceil(totalSubscribers / limitNum);
+  
 
 
     return res
         .status(200)
         .json(
             new ApiResponse(
-                200,
-                getChannelSubscribers,
-                "Subscribers fetched successfully."
+            200,
+            {
+                subscribers: result,
+                currentPage: pageNum,
+                totalPages,
+                totalSubscribers,
+            },
+            "Fetched channel subscribers successfully."
             )
-        )
+        );
 })
 
 
@@ -181,9 +210,18 @@ export const getUserSubscribedChannels = asyncHandler(async (req, res) => {
     const requestingUserId = req.user._id;
     const { userId, page = 1, limit = 10 } = req.query;
     const targetUserId = userId || requestingUserId;
-    const skip = (page - 1) * limit;
   
-      
+
+    if (!isValidObjectId(targetUserId)) {
+        throw new ApiError(400, "Invalid user ID.");
+    }
+
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+
     const totalSubscribedChannels = await Subscription.countDocuments({ subscriber: targetUserId });
   
       
@@ -223,7 +261,7 @@ export const getUserSubscribedChannels = asyncHandler(async (req, res) => {
             $skip: skip 
         }, 
         { 
-            $limit: parseInt(limit) 
+            $limit: limitNum 
         }
     ]);
   
@@ -244,7 +282,7 @@ export const getUserSubscribedChannels = asyncHandler(async (req, res) => {
     }));
   
   
-    const totalPages = Math.ceil(totalSubscribedChannels / limit);
+    const totalPages = Math.ceil(totalSubscribedChannels / limitNum);
   
   
   
@@ -255,7 +293,7 @@ export const getUserSubscribedChannels = asyncHandler(async (req, res) => {
                 200,
                 {
                     subscribedChannels: result,
-                    currentPage: parseInt(page),
+                    currentPage: pageNum,
                     totalPages,
                     totalSubscribedChannels
                 },
@@ -265,7 +303,9 @@ export const getUserSubscribedChannels = asyncHandler(async (req, res) => {
 });
 
 
-export const searchSubscribedChannels = asyncHandler(async (req, res) => {
+/* The above code is a JavaScript function that searches for channels that a user is subscribed to
+based on the provided search criteria. Here is a breakdown of what the code is doing: */
+export const searchUserSubscribedChannels = asyncHandler(async (req, res) => {
     try {
         const requestingUserId = req.user._id;
         const { userId, search = "", page = 1, limit = 10 } = req.query;
