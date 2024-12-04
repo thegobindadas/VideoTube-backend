@@ -6,7 +6,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 
 
 
-export const getVideoLikeDislikeStatus = asyncHandler(async (req, res) => {
+export const getUserLikeDislikeStatusForVideo = asyncHandler(async (req, res) => {
 
     const { videoId } = req.params;
 
@@ -24,10 +24,6 @@ export const getVideoLikeDislikeStatus = asyncHandler(async (req, res) => {
         video: videoId,
         likedBy: req.user?._id
     });
-
-    if (!interaction) {
-        throw new ApiError(404, "Like or Dislike interaction not found for this video.");
-    }
 
 
     let status = interaction ? interaction.type : null;
@@ -51,12 +47,16 @@ export const toggleVideoLikeDislike = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
     const { type } = req.body; // Expect "like" or "dislike" from the request body
 
-    if (!videoId || !["like", "dislike"].includes(type)) {
-        throw new ApiError(400, "Bad Request: Video ID and a valid like/dislike type (either 'like' or 'dislike') are required.");
+    if (!videoId) {
+        throw new ApiError(400, "Bad Request: Video ID is required.");
     }
 
     if (!isValidObjectId(videoId)) {
         throw new ApiError(400, "Invalid video ID format.");
+    }
+
+    if (!["like", "dislike"].includes(type)) {
+        throw new ApiError(400, "Bad Request: Valid like/dislike type (either 'like' or 'dislike') is required.");
     }
 
 
@@ -130,7 +130,7 @@ export const toggleVideoLikeDislike = asyncHandler(async (req, res) => {
 });
 
 
-export const getCommentLikeDislikeStatus = asyncHandler(async (req, res) => {
+export const getUserLikeDislikeStatusForComment = asyncHandler(async (req, res) => {
     
     const { commentId } = req.params;
 
@@ -147,10 +147,6 @@ export const getCommentLikeDislikeStatus = asyncHandler(async (req, res) => {
         comment: commentId,
         likedBy: req.user?._id
     });
-
-    if (!interaction) {
-        throw new ApiError(404, "Like or Dislike interaction not found for this comment.");
-    }
 
 
     let status = interaction ? interaction.type : null;
@@ -188,10 +184,11 @@ export const toggleCommentLikeDislike = asyncHandler(async (req, res) => {
 
 
     // Check if the user has already liked/disliked the comment
-    const existingInteraction = await Like.findOne({
+    const existingInteraction = await LikeDislike.findOne({
         comment: commentId,
         likedBy: req.user?._id,
     });
+
 
     if (existingInteraction) {
         // If the interaction type is the same, remove it
@@ -232,7 +229,7 @@ export const toggleCommentLikeDislike = asyncHandler(async (req, res) => {
         }
     } else {
         // If there's no existing interaction, create a new one
-        const newLike = await Like.create({
+        const newLike = await LikeDislike.create({
             comment: commentId,
             likedBy: req.user?._id,
             type,
@@ -257,7 +254,7 @@ export const toggleCommentLikeDislike = asyncHandler(async (req, res) => {
 });
 
 
-export const getTweetLikeDislikeStatus = asyncHandler(async (req, res) => {
+export const getUserLikeDislikeStatusForTweet = asyncHandler(async (req, res) => {
 
     const { tweetId } = req.params;
 
@@ -276,11 +273,7 @@ export const getTweetLikeDislikeStatus = asyncHandler(async (req, res) => {
         likedBy: req.user?._id,
     });
 
-    if (!interaction) {
-        throw new ApiError(404, "Like or Dislike interaction not found for this tweet.");
-    }
-
-
+    
     let status = interaction ? interaction.type : null;
 
 
@@ -302,12 +295,16 @@ export const toggleTweetLikeDislike = asyncHandler(async (req, res) => {
     const { tweetId } = req.params;
     const { type } = req.body; // Expecting "like" or "dislike" from the request body
 
-    if (!tweetId || !["like", "dislike"].includes(type)) {
-        throw new ApiError(400, "Bad Request: Tweet ID and a valid like/dislike type (either 'like' or 'dislike') are required.");
+    if (!tweetId) {
+        throw new ApiError(400, "Bad Request: Tweet ID is required.");
     }
 
     if (!isValidObjectId(tweetId)) {
         throw new ApiError(400, "Invalid tweet id");
+    }
+
+    if (!["like", "dislike"].includes(type)) {
+        throw new ApiError(400, "Bad Request: Valid like/dislike type (either 'like' or 'dislike') is required.");
     }
 
 
@@ -316,6 +313,7 @@ export const toggleTweetLikeDislike = asyncHandler(async (req, res) => {
         tweet: tweetId,
         likedBy: req.user?._id
     });
+
 
     if (interaction) {
         // If the same type of interaction exists, remove it (toggle off)
@@ -339,7 +337,6 @@ export const toggleTweetLikeDislike = asyncHandler(async (req, res) => {
                 );
         } else {
             // If the opposite type of interaction exists, update to the new type
-
             interaction.type = type;
             
             await interaction.save();

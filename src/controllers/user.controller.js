@@ -489,7 +489,7 @@ export const updateUserCoverImage = asyncHandler(async (req, res) => {
 });
 
 
-export const getChannelProfile = asyncHandler(async (req, res) => {
+export const getUserChannelProfile = asyncHandler(async (req, res) => {
 
     const { username } = req.params
 
@@ -622,7 +622,8 @@ export const getWatchHistory = asyncHandler(async (req, res) => {
                             ]
                         }
                     },
-                    { $addFields: { owner: { $first: "$owner" } } }
+                    { $addFields: { owner: { $first: "$owner" } } },
+                    { $sort: { createdAt: -1 } } 
                 ]
             }
         }

@@ -1,6 +1,7 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Comment } from "../models/comment.model.js";
+import { LikeDislike } from "../models/likeDislike.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
@@ -18,6 +19,10 @@ export const addComment = asyncHandler(async (req, res) => {
 
     if (!videoId) {
         throw new ApiError(400, "Video id is required.")
+    }
+
+    if (!isValidObjectId(videoId)) {
+        throw new ApiError(400, "Invalid video id.")
     }
 
 
@@ -140,11 +145,10 @@ export const deleteComment = asyncHandler(async (req, res) => {
 });
 
 
-export const getCommentsForVideo = asyncHandler(async (req, res) => {
-
+export const getCommentsForVideo = asyncHandler(async (req, res) => { 
+    
     const { videoId } = req.params
     const { page = 1, limit = 3 } = req.query
-
 
     if (!videoId) {
         throw new ApiError(400, "Video id is required.")
@@ -154,18 +158,62 @@ export const getCommentsForVideo = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid video id.")
     }
 
-
+    
     const comments = await Comment.find({ video: videoId })
         .populate('owner', 'username fullName avatar')
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit) 
         .limit(Number(limit));
-        
-    if (!comments) {
-        throw new ApiError(404, "No comments found for this video.")
+
+    if (!comments || comments.length === 0) {
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    {
+                        comments: [],
+                        totalComments: comments.length,
+                        totalPages: Math.ceil(comments.length / limit),
+                        currentPage: Number(page),
+                    },
+                    "Comments fetched successfully."
+                )
+            );
     }
 
-    // Get total count of comments for the video
+    
+    const commentsWithLikesDislikes = await Promise.all(
+        comments.map(async (comment) => {
+            
+            const totalLikes = await LikeDislike.countDocuments({ comment: comment._id, type: 'like' });
+            const totalDislikes = await LikeDislike.countDocuments({ comment: comment._id, type: 'dislike' });
+
+            
+            const userLikeDislike = await LikeDislike.findOne({
+                comment: comment._id,
+                likedBy: req.user._id
+            });
+
+
+            let isCommentLikedDislikedByMe = null;
+
+            if (userLikeDislike) {
+                isCommentLikedDislikedByMe = userLikeDislike.type;
+            }
+
+            
+            comment = comment.toObject(); // Convert to plain object to modify
+            comment.totalLikes = totalLikes;
+            comment.totalDislikes = totalDislikes;
+            comment.isCommentLikedDislikedByMe = isCommentLikedDislikedByMe;
+
+
+            return comment;
+        })
+    );
+
+    
     const totalComments = await Comment.countDocuments({ video: videoId });
 
 
@@ -176,12 +224,12 @@ export const getCommentsForVideo = asyncHandler(async (req, res) => {
             new ApiResponse(
                 200,
                 {
-                    comments,
+                    comments: commentsWithLikesDislikes,
                     totalComments,
                     totalPages: Math.ceil(totalComments / limit),
                     currentPage: Number(page),
                 },
                 "Comments fetched successfully."
             )
-        )
+        );
 });

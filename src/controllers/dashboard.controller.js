@@ -18,7 +18,7 @@ export const getChannelStatistics = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid channel id.");
     }
 
-       
+
     const channel = await User.findById(channelId);
 
     if (!channel) {
@@ -52,7 +52,8 @@ export const getChannelStatistics = asyncHandler(async (req, res) => {
 
     // Get the total number of likes across all videos for the channel
     const totalLikes = await LikeDislike.countDocuments({
-        video: { $in: await Video.find({ owner: channelId }).select("_id") }
+        video: { $in: await Video.find({ owner: channelId }).select("_id") },
+        type: "like" // Filter for likes only
     });
 
 
@@ -79,6 +80,9 @@ export const getVideosByChannel = asyncHandler(async (req, res) => {
     const channelId = req.user._id;
     const { page = 1, limit = 5 } = req.query;
 
+    if (!channelId) {
+        throw new ApiError(400, "Channel id is required.");
+    }
 
     if (!isValidObjectId(channelId)) {
         throw new ApiError(400, "Invalid channel id.");
@@ -163,6 +167,136 @@ export const getVideosByChannel = asyncHandler(async (req, res) => {
                     currentPage: Number(page),
                 },
                 "Channel videos fetched successfully"
+            )
+        );
+});
+
+
+export const getChannelData = asyncHandler(async (req, res) => {
+    
+    const channelId = req.user._id;
+    const { page = 1, limit = 2 } = req.query;
+
+    if (!isValidObjectId(channelId)) {
+        throw new ApiError(400, "Invalid channel id.");
+    }
+
+
+    const channel = await User.findById(channelId);
+
+    if (!channel) {
+        throw new ApiError(404, "Channel not found.");
+    }
+
+    
+    // Fetch channel statistics
+    const [totalVideos, totalSubscribers, totalVideoViews, totalLikes, videos] = await Promise.all([
+        
+        // Total number of videos
+        Video.countDocuments({ owner: channelId }),
+    
+
+        // Total number of subscribers
+        Subscription.countDocuments({ channel: channelId }),
+        
+
+        // Total video views
+        Video.aggregate([
+            { $match: { owner: new mongoose.Types.ObjectId(channelId) } },
+            { $group: { _id: null, totalViews: { $sum: "$views" } } },
+        ]),
+
+
+        //Get the total number of likes across all videos for the channel
+        LikeDislike.countDocuments({
+            video: { $in: await Video.find({ owner: channelId }).select("_id") },
+            type: "like" // Filter for likes only
+        }),
+
+
+        // Fetch paginated videos with likes and dislikes
+        Video.aggregate([
+            { $match: { owner: new mongoose.Types.ObjectId(channelId) } },
+            {
+                $lookup: {
+                    from: "likedislikes",
+                    let: { videoId: "$_id" },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ["$video", "$$videoId"] } } },
+                        {
+                            $group: {
+                                _id: "$type",
+                                count: { $sum: 1 },
+                            },
+                        },
+                    ],
+                    as: "likesDislikes",
+                },
+            },
+            {
+                $addFields: {
+                    totalLikes: {
+                        $ifNull: [
+                            { $arrayElemAt: [{ $filter: { input: "$likesDislikes", as: "ld", cond: { $eq: ["$$ld._id", "like"] } } }, 0] },
+                            { count: 0 },
+                        ],
+                    },
+                    totalDislikes: {
+                        $ifNull: [
+                            { $arrayElemAt: [{ $filter: { input: "$likesDislikes", as: "ld", cond: { $eq: ["$$ld._id", "dislike"] } } }, 0] },
+                            { count: 0 },
+                        ],
+                    },
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    thumbnail: 1,
+                    title: 1,
+                    isPublished: 1,
+                    createdAt: 1,
+                    totalLikes: "$totalLikes.count",
+                    totalDislikes: "$totalDislikes.count",
+                },
+            },
+            { $sort: { createdAt: -1 } },
+            { $skip: (page - 1) * limit },
+            { $limit: Number(limit) },
+        ]),
+    ]);
+
+
+    // Calculate total views
+    const totalViews = totalVideoViews.length > 0 ? totalVideoViews[0].totalViews : 0;
+
+
+    // Get total pages for pagination
+    const totalVideoCount = await Video.countDocuments({ owner: channelId });
+    const totalPages = Math.ceil(totalVideoCount / limit);
+
+
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    stats: {
+                        totalVideos,
+                        totalSubscribers,
+                        totalViews,
+                        totalLikes,
+                    },
+                    videos: {
+                        data: videos,
+                        totalVideos: totalVideoCount,
+                        totalPages,
+                        currentPage: Number(page),
+                    },
+                },
+                "Channel data fetched successfully"
             )
         );
 });

@@ -130,12 +130,15 @@ export const getVideoById = asyncHandler(async (req, res) => {
     }
 
 
-    const [likesCount, dislikesCount] = await Promise.all([
+    const [likesCount, dislikesCount, userLikeDislikeStatus] = await Promise.all([
         LikeDislike.countDocuments({ video: videoId, type: 'like' }),
-        LikeDislike.countDocuments({ video: videoId, type: 'dislike' })
+        LikeDislike.countDocuments({ video: videoId, type: 'dislike' }),
+        LikeDislike.findOne({ video: videoId, likedBy: req.user?._id})
     ]);
 
+    const isVideoLikedByMe = userLikeDislikeStatus ? userLikeDislikeStatus.type : null;
 
+    
     const totalSubscribers = video.owner
         ? await Subscription.countDocuments({ channel: video.owner._id })
         : 0;
@@ -156,6 +159,7 @@ export const getVideoById = asyncHandler(async (req, res) => {
                     createdAt: video.createdAt,
                     totalLikes: likesCount,
                     totalDislikes: dislikesCount,
+                    isVideoLikedByMe,
                     ownerId: video.owner._id,
                     ownerName: video.owner.fullName,
                     ownerAvatar: video.owner.avatar,
@@ -645,6 +649,10 @@ export const getVideosByChannel = asyncHandler(async (req, res) => {
 
 export const getLikedVideos = asyncHandler(async (req, res) => {
         
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+
     const likedVideos = await LikeDislike.aggregate([
         {
             $match: {
@@ -663,9 +671,11 @@ export const getLikedVideos = asyncHandler(async (req, res) => {
                             _id: 1,
                             title: 1,
                             thumbnail: 1,
-                            description: 1, // Include other fields if necessary
+                            description: 1,
+                            duration: 1, // Include the duration field
                             views: 1,
-                            createdAt: 1 // Add timestamps if needed
+                            createdAt: 1,
+                            owner: 1 // Include the owner field for later population
                         }
                     }
                 ]
@@ -680,12 +690,51 @@ export const getLikedVideos = asyncHandler(async (req, res) => {
             $replaceRoot: {
                 newRoot: "$liked_videos"
             }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "ownerDetails"
+            }
+        },
+        {
+            $unwind: {
+                path: "$ownerDetails"
+            }
+        },
+        {
+            $project: {
+                _id: 1,
+                thumbnail: 1,
+                title: 1,
+                description: 1,
+                duration: 1,
+                views: 1,
+                createdAt: 1,
+                "ownerDetails._id": 1,
+                "ownerDetails.username": 1,
+                "ownerDetails.fullName": 1,
+                "ownerDetails.avatar": 1
+            }
+        },
+        {
+            $skip: skip
+        },
+        {
+            $limit: parseInt(limit)
         }
     ]);
 
-    if (!likedVideos || likedVideos.length === 0) {
-        return res.status(404).json(new ApiResponse(404, [], "No liked videos found"));
-    }
+
+    const totalLikedVideos = await LikeDislike.countDocuments({
+        video: { $exists: true },
+        likedBy: new mongoose.Types.ObjectId(req.user._id),
+        type: "like"
+    });
+
+    const totalPages = Math.ceil(totalLikedVideos / limit);
 
 
 
@@ -694,8 +743,13 @@ export const getLikedVideos = asyncHandler(async (req, res) => {
         .json(
             new ApiResponse(
                 200,
-                likedVideos,
-                "Liked videos fetched successfully"
+                {
+                    likedVideos,
+                    totalLikedVideos,
+                    totalPages,
+                    currentPage: page
+                },
+                "Liked videos fetched successfully."
             )
         );
 });

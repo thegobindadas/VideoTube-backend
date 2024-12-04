@@ -43,7 +43,8 @@ export const createNewTweet = asyncHandler(async (req, res) => {
 export const getTweetsByUser = asyncHandler(async (req, res) => {
 
     const { userId } = req.params;
-    const { page = 1, limit = 4 } = req.query; 
+    const { page = 1, limit = 4 } = req.query;
+    const currentUserId = req.user._id;
 
     if (!userId) {
         throw new ApiError(400, "User id is required.");
@@ -53,8 +54,9 @@ export const getTweetsByUser = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid user id.");
     }
 
-    
+
     const skip = (page - 1) * limit;
+
 
     const tweets = await Tweet.aggregate([
         { $match: { owner: new mongoose.Types.ObjectId(userId) } },
@@ -84,17 +86,55 @@ export const getTweetsByUser = asyncHandler(async (req, res) => {
             },
         },
         {
+            $lookup: {
+                from: "likedislikes",
+                localField: "_id",
+                foreignField: "tweet",
+                as: "userInteractions",
+            },
+        },
+        {
+            $addFields: {
+                isTweetLikedDislikedByMe: {
+                    $cond: {
+                        if: {
+                            $gt: [
+                                { $size: { $filter: { input: "$userInteractions", as: "ui", cond: { $eq: ["$$ui.likedBy", new mongoose.Types.ObjectId(currentUserId)] } } } },
+                                0,
+                            ],
+                        },
+                        then: {
+                            $let: {
+                                vars: {
+                                    interaction: {
+                                        $arrayElemAt: [
+                                            { $filter: { input: "$userInteractions", as: "ui", cond: { $eq: ["$$ui.likedBy", new mongoose.Types.ObjectId(currentUserId)] } } },
+                                            0,
+                                        ],
+                                    },
+                                },
+                                in: "$$interaction.type",
+                            },
+                        },
+                        else: null,
+                    },
+                },
+            },
+        },
+        {
             $project: {
                 interactions: 0,
+                userInteractions: 0,
             },
         },
     ]);
 
-    
+
     const populatedTweets = await Tweet.populate(tweets, {
         path: "owner",
         select: "avatar username fullName _id",
     });
+
 
     const totalTweets = await Tweet.countDocuments({ owner: userId });
 
@@ -103,33 +143,37 @@ export const getTweetsByUser = asyncHandler(async (req, res) => {
 
 
     if (!tweets || tweets.length === 0) {
-        return res.status(200).json(
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    {
+                        tweets: [],
+                        totalTweets: totalTweets || 0,
+                        totalPages,
+                        currentPage: page,
+                    },
+                    "Tweets fetched successfully."
+                )
+            );
+    }
+
+
+    return res
+        .status(200)
+        .json(
             new ApiResponse(
                 200,
                 {
-                    tweets: [],
-                    totalTweets: totalTweets || 0,
+                    tweets: populatedTweets,
+                    totalTweets,
                     totalPages,
                     currentPage: page,
                 },
                 "Tweets fetched successfully."
             )
         );
-    }
-
-    
-    return res.status(200).json(
-        new ApiResponse(
-            200,
-            {
-                tweets: populatedTweets,
-                totalTweets,
-                totalPages,
-                currentPage: page,
-            },
-            "Tweets fetched successfully."
-        )
-    );
 });
 
 

@@ -52,7 +52,7 @@ router.route("/:videoId/recommendations").get(fetchRecommendedVideos);
 
 router.route("/channel/:channelId/videos").get(getVideosByChannel);
 
-router.route("/liked-videos").get(getLikedVideos);
+router.route("/me/liked-videos").get(getLikedVideos);
 
 
 
