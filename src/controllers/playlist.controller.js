@@ -9,11 +9,14 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 
 export const createPlaylist = asyncHandler(async (req, res) => {
     
-    const { name, description = name.trim() + " videos" } = req.body
+    const { name, description } = req.body
     
-    if (!name || !description) {
-        throw new ApiError(400, "Playlist name and description are required.")
+    if (!name) {
+        throw new ApiError(400, "Playlist name is required.")
     }
+
+
+    const finalDescription = description || `${name.trim()} videos`;
     
     
     const existingPlaylist = await Playlist.findOne({
@@ -28,7 +31,7 @@ export const createPlaylist = asyncHandler(async (req, res) => {
     
     const playlist = await Playlist.create({
         name,
-        description,
+        description: finalDescription,
         owner: req.user._id
     })
 
@@ -108,10 +111,13 @@ export const addVideoToPlaylist = asyncHandler(async (req, res) => {
 
 export const getUserPlaylists = asyncHandler(async (req, res) => {
 
-    const { userId } = req.params;
+    const { userId } = req.query;
+    const requestingUserId = req.user?._id;
+    
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 2;
     const skip = (page - 1) * limit;
+
 
     if (!userId) {
         throw new ApiError(400, "User ID is required.");
@@ -122,11 +128,22 @@ export const getUserPlaylists = asyncHandler(async (req, res) => {
     }
 
 
+    // Define match criteria based on whether the user is requesting their own playlists
+    const matchCriteria = {
+        owner: new mongoose.Types.ObjectId(userId),
+    };
+
+    const userIdAsObjectId = new mongoose.Types.ObjectId(userId);
+    
+    // Add isPublic: true only if userId !== requestingUserId
+    if (!userIdAsObjectId.equals(requestingUserId)) {
+        matchCriteria.isPublic = true;
+    }
+
+
     const playlists = await Playlist.aggregate([
         { 
-            $match: { 
-                owner: new mongoose.Types.ObjectId(userId) 
-            } 
+            $match: matchCriteria
         },
         {
             $lookup: {
@@ -156,7 +173,7 @@ export const getUserPlaylists = asyncHandler(async (req, res) => {
         { $limit: limit }
     ]);
 
-    const totalPlaylists = await Playlist.countDocuments({ owner: userId });
+    const totalPlaylists = await Playlist.countDocuments(matchCriteria);
 
     const totalPages = Math.ceil(totalPlaylists / limit);
 
@@ -258,7 +275,7 @@ export const getMyPlaylistsNames = asyncHandler(async (req, res) => {
         );
 });
 
-////////////////////////////////
+
 export const getPlaylistById = asyncHandler(async (req, res) => {
 
     const { playlistId } = req.params;
@@ -331,7 +348,7 @@ export const getPlaylistById = asyncHandler(async (req, res) => {
     if (!playlist || playlist.length === 0) {
         throw new ApiError(404, "Not Found: Playlist not found or is empty.");
     }
-
+    
 
 
     return res
@@ -475,6 +492,7 @@ export const getPlaylistVideos = asyncHandler(async (req, res) => {
 export const getPlaylistDetailsWithVideos = asyncHandler(async (req, res) => {
     
     const { playlistId } = req.params;
+    const requestingUserId = req.user?._id;
     const { page = 1, limit = 10 } = req.query;
 
     if (!playlistId) {
@@ -489,6 +507,20 @@ export const getPlaylistDetailsWithVideos = asyncHandler(async (req, res) => {
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
+
+
+    const playlistCheck = await Playlist.findById(playlistId).select("owner isPublic").lean();
+
+    if (!playlistCheck) {
+        throw new ApiError(404, "Playlist not found.");
+    }
+
+
+    const isOwner = playlistCheck.owner.toString() === requestingUserId.toString();
+
+    if (!isOwner && !playlistCheck.isPublic) {
+        throw new ApiError(403, "Access denied. This playlist is private.");
+    }
 
 
     // Aggregate to fetch playlist details along with the video details
@@ -561,6 +593,14 @@ export const getPlaylistDetailsWithVideos = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
+                from: "videos",
+                localField: "videos",
+                foreignField: "_id",
+                as: "videoDetails"
+            }
+        },
+        {
+            $lookup: {
                 from: "users",
                 localField: "owner",
                 foreignField: "_id",
@@ -569,7 +609,7 @@ export const getPlaylistDetailsWithVideos = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
-                from: "subscriptions",  
+                from: "subscriptions",
                 localField: "owner",
                 foreignField: "channel",
                 as: "ownerSubscribers"
@@ -612,8 +652,113 @@ export const getPlaylistDetailsWithVideos = asyncHandler(async (req, res) => {
 
     const totalVideos = totalVideosResult[0]?.totalVideos || 0;
 
-    if (!playlist || playlist.length === 0 || result.length === 0) {
-        throw new ApiError(404, "Not Found: Playlist or videos not found.");
+    if (!playlist || playlist.length === 0) {
+        throw new ApiError(404, "Not Found: Playlist not found.");
+    }
+    
+    
+    
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    playlistInfo: playlist[0],
+                    playlistVideos: result,
+                    currentPage: pageNum,
+                    totalPages: Math.ceil(totalVideos / limitNum),
+                    totalVideos
+                },
+                "Playlist and videos fetched successfully."
+            )
+        );
+});
+
+
+export const updatePlaylistDetails = asyncHandler(async (req, res) => {
+
+    const { playlistId } = req.params;
+    const { name, description } = req.body;
+
+        
+    if (!playlistId) {
+        throw new ApiError(400, "Playlist id is required.");
+    }
+
+    if (!isValidObjectId(playlistId)) {
+        throw new ApiError(400, "Invalid playlist id.");
+    }
+
+        
+    const playlist = await Playlist.findById(playlistId);
+
+    if (!playlist) {
+        throw new ApiError(404, "Not Found: Playlist not found.");
+    }
+
+        
+    if (playlist.owner.toString() !== req.user._id.toString()) {
+        throw new ApiError(403, "Forbidden: You do not have permission to update this playlist.");
+    }
+
+        
+    if (name) playlist.name = name;
+
+    if (description) playlist.description = description;
+
+        
+    const updatedPlaylist = await playlist.save();      
+
+    if (!updatedPlaylist) {
+        throw new ApiError(500, "Internal Server Error: Failed to update the playlist.");
+    }
+
+
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200, 
+                updatedPlaylist, 
+                "Playlist updated successfully."
+            )
+        );
+});
+
+
+export const togglePlaylistVisibility = asyncHandler(async (req, res) => {
+
+    const { playlistId } = req.params;
+
+    if (!playlistId) {
+        throw new ApiError(400, "Playlist ID is required.");
+    }
+
+    if (!isValidObjectId(playlistId)) {
+        throw new ApiError(400, "Invalid Playlist ID.");
+    }
+
+
+    const playlist = await Playlist.findById(playlistId);
+
+    if (!playlist) {
+        throw new ApiError(404, "Not Found: Playlist not found.");
+    }
+
+    
+    if (playlist.owner.toString() !== req.user._id.toString()) {
+        throw new ApiError(403, "Forbidden: You do not have permission to modify this playlist.");
+    }
+
+    
+    playlist.isPublic = !playlist.isPublic;
+
+    const updatedPlaylist = await playlist.save();
+
+    if (!updatedPlaylist) {
+        throw new ApiError(500, "Internal Server Error: Failed to update the playlist.");
     }
 
 
@@ -623,14 +768,8 @@ export const getPlaylistDetailsWithVideos = asyncHandler(async (req, res) => {
         .json(
             new ApiResponse(
                 200,
-                {
-                    playlist: playlist[0],
-                    playlistVideos: result,
-                    currentPage: pageNum,
-                    totalPages: Math.ceil(totalVideos / limitNum),
-                    totalVideos
-                },
-                "Playlist and videos fetched successfully."
+                { isPublic: updatedPlaylist.isPublic },
+                `Playlist is now ${updatedPlaylist.isPublic ? "public" : "private"}.`
             )
         );
 });
@@ -694,58 +833,6 @@ export const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
                 200,
                 updatedPlaylist,
                 "Video removed from playlist successfully."
-            )
-        );
-});
-
-
-export const updatePlaylist = asyncHandler(async (req, res) => {
-
-    const { playlistId } = req.params;
-    const { name, description } = req.body;
-
-        
-    if (!playlistId) {
-        throw new ApiError(400, "Playlist id is required.");
-    }
-
-    if (!isValidObjectId(playlistId)) {
-        throw new ApiError(400, "Invalid playlist id.");
-    }
-
-        
-    const playlist = await Playlist.findById(playlistId);
-
-    if (!playlist) {
-        throw new ApiError(404, "Not Found: Playlist not found.");
-    }
-
-        
-    if (playlist.owner.toString() !== req.user._id.toString()) {
-        throw new ApiError(403, "Forbidden: You do not have permission to update this playlist.");
-    }
-
-        
-    if (name) playlist.name = name;
-
-    if (description) playlist.description = description;
-
-        
-    const updatedPlaylist = await playlist.save();      
-
-    if (!updatedPlaylist) {
-        throw new ApiError(500, "Internal Server Error: Failed to update the playlist.");
-    }
-
-
-
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(
-                200, 
-                updatedPlaylist, 
-                "Playlist updated successfully."
             )
         );
 });

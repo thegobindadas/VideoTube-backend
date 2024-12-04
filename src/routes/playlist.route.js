@@ -8,7 +8,8 @@ import {
     getPlaylistDetailsWithVideos,
     getUserPlaylists,
     getMyPlaylistsNames,
-    updatePlaylist,
+    updatePlaylistDetails,
+    togglePlaylistVisibility,
     removeVideoFromPlaylist,
     deletePlaylist,
 } from "../controllers/playlist.controller.js";
@@ -23,11 +24,11 @@ router.use(verifyJWT);
 
 router.route("/").post(createPlaylist);
 
-router.route("/add-video/:playlistId/:videoId").patch(addVideoToPlaylist);
+router.route("/:playlistId/add/videos/:videoId").patch(addVideoToPlaylist);
 
-router.route("/user/:userId/playlists").get(getUserPlaylists);
+router.route("/user").get(getUserPlaylists);
 
-router.route("/my-playlists").get(getMyPlaylistsNames);
+router.route("/me/names").get(getMyPlaylistsNames);
 
 router.route("/:playlistId").get(getPlaylistById);
 
@@ -35,9 +36,11 @@ router.route("/:playlistId/videos").get(getPlaylistVideos);
 
 router.route("/:playlistId/details-with-videos").get(getPlaylistDetailsWithVideos);
 
-router.route("/remove-video/:playlistId/:videoId").patch(removeVideoFromPlaylist);
+router.route("/update-details/:playlistId").patch(updatePlaylistDetails);
 
-router.route("/update/:playlistId").patch(updatePlaylist);
+router.route("/:playlistId/toggle-public").patch(togglePlaylistVisibility);
+
+router.route("/:playlistId/remove/videos/:videoId").patch(removeVideoFromPlaylist);
    
 router.route("/remove/:playlistId").delete(deletePlaylist);
 
